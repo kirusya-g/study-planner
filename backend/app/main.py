@@ -1,4 +1,90 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
+
+#User(data that come from client)
+class UselCreate(BaseModel):
+    email: str
+    nickname: str
+    password: str
+#User(data that we get back to client)
+class User(BaseModel):
+    id: int
+    nickname: str
+    email: str
+
+
+#Calendar
+class CalendarCreate(BaseModel):
+    name: str
+    color: str
+
+class Calendar(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    color: str
+
+
+#Lesson
+class LessonCreate(BaseModel):
+    calendar_id : int
+    name: str
+    room: Optional[str] = None
+    day_of_week: str
+    time_start: str
+    time_end: str
+    descriptions: Optional[str] = None
+    color: str = "#3498db"
+    is_reccuring: bool = True
+    links = List[str] = []
+    files = List[str] = []
+
+class Lesson(LessonCreate):
+    id: int
+
+#Task
+class TaskCreate(BaseModel):
+    calendar_id: int
+    lesson_id: Optional[int] = None
+    parent_task_id: Optional[int] = None
+    title: str
+    descriprions: Oprional[str] = None
+    day: str
+    time: Optional[str] = None
+    deadline: Optional[str] = None
+    color:  str = "#2ecc71"
+    links = List[str] = []
+    files = List[str] = []
+    is_done: bool = False
+
+class Task(TaskCreate):
+    id: int
+
+#Note
+class NoteCreate(BaseModel):
+    calendar_id: int
+    day: str
+    text: str
+
+class Note(NoteCreate):
+    id: int
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 app = FastAPI()
 @app.get("/")
 def root():
