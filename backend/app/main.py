@@ -69,7 +69,24 @@ class NoteCreate(BaseModel):
 class Note(NoteCreate):
     id: int
     
+user: dict = {}
+calendar: dict = {}
+lesson: dict = {}
+task: dict = {}
+note: dict = {}
 
+_counters = {
+    "user": 0,
+    "calendar": 0,
+    "lesson": 0,
+    "task": 0,
+    "note": 0,
+}
+
+def next_id(entity: str) -> int:
+    """Adds 1 to the counter of the given entity and returns the new number."""
+    _counters[entity] += 1
+    return _counters[entity]
 
 
 
