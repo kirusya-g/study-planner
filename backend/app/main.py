@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import Optional, List
 
 #User(data that come from client)
 class UserCreate(BaseModel):
@@ -36,8 +37,8 @@ class LessonCreate(BaseModel):
     descriptions: Optional[str] = None
     color: str = "#3498db"
     is_reccuring: bool = True
-    links = List[str] = []
-    files = List[str] = []
+    links: List[str] = []
+    files: List[str] = []
 
 class Lesson(LessonCreate):
     id: int
@@ -48,13 +49,13 @@ class TaskCreate(BaseModel):
     lesson_id: Optional[int] = None
     parent_task_id: Optional[int] = None
     title: str
-    descriprions: Oprional[str] = None
+    descriprions: Optional[str] = None
     day: str
     time: Optional[str] = None
     deadline: Optional[str] = None
     color:  str = "#2ecc71"
-    links = List[str] = []
-    files = List[str] = []
+    links: List[str] = []
+    files: List[str] = []
     is_done: bool = False
 
 class Task(TaskCreate):
@@ -104,24 +105,24 @@ def create_user(data: UserCreate):
         "nickname": data.nickname,
         "password": data.password, 
     }  
-    users[user_id] = user
+    user[user_id] = user
     return user
 
 @app.get("/user/{user_id}", response_model = User)
 def get_user(user_id: int):
-    user = user.get(user_id)
+    found_user = users.get(user_id)
     if not user:
-        raise HTTPException(status_code = 404, details = "User not found")
+        raise HTTPException(status_code = 404, detail = "User not found")
     return user
 
 #Calendar
 @app.post("/users/{user_id}/calendars/", response_model = Calendar)
 def create_calendar(user_id: int, data: CalendarCreate):
     if user_id not in user:
-        raise HTTPException(status_code = 404, details = "User not found")
+        raise HTTPException(status_code = 404, detail = "User not found")
     cal_id = next_id("calendar")
     calendar = {"id": cal_id, "user_id": user_id, **data.model_dump()}
-    calendars[cal_id] = calendar
+    calendar[cal_id] = calendar
     return calendar
 
 @app.get("/user/{user_id}/calendars/", response_model = list[Calendar])
@@ -132,44 +133,44 @@ def list_calendar(user_id: int):
 @app.post("/calendars/{calendar_id}/lessons/", response_model = Lesson)
 def create_lesson(calendar_id: int, data: LessonCreate):
     if calendar_id not in calendar:
-        raise HTTPException(status_code = 404, details = "Calendar not found")
+        raise HTTPException(status_code = 404, detail = "Calendar not found")
     les_id = next_id("lesson")
     lesson = {"id": les_id, **data.model_dump()}
-    lessons[les_id] = lesson
+    lesson[les_id] = lesson
     return lesson
 
 @app.get("/user/{calender_id}/lessons/", response_model = list[Lesson])
-def list_lesson(user_id: int):
+def list_lesson(calendar_id: int):
     return [l for l in lesson.values() if l["calendar_id"] == calendar_id]
 
 #Task
-@app.post("/task", resposne_model = Lesson)
+@app.post("/task", response_model = Task)
 def create_task(data: TaskCreate):
-    if calendar_id not in calendar:
-        raise HTTPException(status_code = 404, details = "Calendar not found")
+    if data.calendar_id not in calendar:
+        raise HTTPException(status_code = 404, detail = "Calendar not found")
     task_id = next_id("task")
     task = {"id": task_id, **data.model_dump()}
-    tasks[task_id] = task
+    task[task_id] = task
     return task
 
-@app.get("/calendars/{calendar_id}/tasks/", response_model = lisr[Task])
-def list_calendar(calendar_id: int):
-    return [t for t in task.values() if l["calendar_id"] == calendar_id]
+@app.get("/calendars/{calendar_id}/tasks/", response_model = list[Task])
+def list_tasks(calendar_id: int):
+    return [t for t in task.values() if t["calendar_id"] == calendar_id]
 
 @app.patch("/tasks/{task_id}/toggle-done", response_model = Task)
 def toggle_done(task_id: int):
     task = tasks.get(task_id)
     if not task:
-        raise HTTPException(status_code = 404, details = "Task not found")
+        raise HTTPException(status_code = 404, detail = "Task not found")
     task["is_done"] = not task["is_done"]
     return task
 
 #Notes
-@app.post("/notes", response_model = Notes)
-def create_notes(notes: NoteCreate):
+@app.post("/notes", response_model = Note)
+def create_notes(data: NoteCreate):
     if data.calendar_id not in calendar:
-        raise HTTPException(status_code = 404, details = "Calendar not found")
+        raise HTTPException(status_code = 404, detail = "Calendar not found")
     note_id = next_id("note")
     note = {"id": note_id, **data.model_dump()}
-    notes[note_id] = note
+    note[note_id] = note
     return note
