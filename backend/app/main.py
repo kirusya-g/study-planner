@@ -115,6 +115,23 @@ def get_user(user_id: int):
         raise HTTPException(status_code = 404, detail = "User not found")
     return user
 
+@app.put("/users/{user_id}", response_model = User)
+def update_user(user_id: int, data: UserCreate):
+    if user_id not in users:
+        raise HTTPException(status_code = 404, detail = "User not found")
+
+    updated_user = {"id": user_id, **data.model_dump()}
+    users[user_id] = updated_user
+    return updated_user
+
+@app.delete("/users/{user_id}")
+def detele_user(user_id: int):
+    if user_id not in users:
+        raise HTTPException(status_code = 404, detail = "User not found")
+
+    del users[user_id]
+    return {"message": f"User {user_id} deleted"}
+
 #Calendar
 @app.post("/users/{user_id}/calendars/", response_model = Calendar)
 def create_calendar(user_id: int, data: CalendarCreate):
@@ -125,12 +142,30 @@ def create_calendar(user_id: int, data: CalendarCreate):
     calendar[cal_id] = calendar
     return calendar
 
-@app.get("/user/{user_id}/calendars/", response_model = list[Calendar])
+@app.get("/users/{user_id}/calendars/", response_model = list[Calendar])
 def list_calendar(user_id: int):
     return [c for c in calendar.values() if c["user_id"] == user_id]
 
+@app.put("/users/{user_id}/calendars/{cal_id}", response_model = Calendar)
+def update_calendar(user_id: int, cal_id: int, data: CalendarCreate):
+    if cal_id not in calendars:
+        raise HTTPException(status_code = 404, detail = "Calendar not found")
+    if user_id not in users:
+        raise HTTPException(status_code = 404, detail = "User not found")
+    updated_calendar = {"id": cal_id, "user_id" : user_id, **data.model_dump()}
+    calendars[cal_id] = updated_calendar
+    return updated_calendar
+
+@app.delete("/users/{user_id}/calendars/{cal_id}")
+def delete_calendar(user_id: int, cal_id: int):
+    if cal_id not in calendars:
+        raise HTTPException(status_code = 404, detail = "Calendar not found")
+
+    del calendars[cal_id]
+    return {"message": f"Calendar {cal_id} deleted"}
+
 #Lesson
-@app.post("/calendars/{calendar_id}/lessons/", response_model = Lesson)
+@app.post("/calendars/{cal_id}/lessons/", response_model = Lesson)
 def create_lesson(calendar_id: int, data: LessonCreate):
     if calendar_id not in calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
@@ -139,9 +174,29 @@ def create_lesson(calendar_id: int, data: LessonCreate):
     lesson[les_id] = lesson
     return lesson
 
-@app.get("/user/{calender_id}/lessons/", response_model = list[Lesson])
+@app.get("/user/{cal_id}/lessons/", response_model = list[Lesson])
 def list_lesson(calendar_id: int):
     return [l for l in lesson.values() if l["calendar_id"] == calendar_id]
+
+@app.put("/calendars/{cal_id}/lessons/{les_id}", response_model = Lesson)
+def update_lesson(cal_id: int, les_id: int, data: LessonCreate):
+    if les_id not in lessons:
+        raise HTTPException(status_code = 404, detail = "Lesson not found")
+    if cal_id not in calendars:
+        raise HTTPException(status_code = 404, detail = "Calender not found")
+    updated_lesson = {"id": les_id, "calendar_id": cal_id, **data.model_dump()}
+    lessons[les_id] = updated_lesson
+    return updated_lesson
+
+@app.delete("/calendars/{cal_id}/lessons/{les_id}")
+def delete_lesson(cal_id: int, les_id: int):
+    if les_id not in lessons:
+        raise HTTPException(status_code = 404, detail = "Lesson not found")
+    
+    del lessons[les_id]
+    return {"message": f"Lesson {les_id} deleted"}
+
+
 
 #Task
 @app.post("/task", response_model = Task)
@@ -165,6 +220,26 @@ def toggle_done(task_id: int):
     task["is_done"] = not task["is_done"]
     return task
 
+@app.put("/tasks/{task_id}", response_model = Task)
+def update_task(task_id: int, data: TaskCreate):
+    if task_id not in tasks:
+        raise HTTPException(status_code = 404, detail = "Task not found")
+    if data.calendar_id not in calendars:
+        raise HTTPException(status_code = 404, detail = "Calendar not found")
+
+    updated_task = {"id": task_id, **data.model_dump()}
+    tasks[task_id] = updated_task
+    return updated_task
+
+@app.delete("/tasks/{task_id}")
+def delete_task(task_id: int):
+    if task_id not in tasks:
+        raise HTTPException(status_code = 404, detail = "Task not found")
+
+    del tasks[task_id]
+    return {"message": f"Task {task_id} deleted"}
+
+
 #Notes
 @app.post("/notes", response_model = Note)
 def create_notes(data: NoteCreate):
@@ -174,3 +249,22 @@ def create_notes(data: NoteCreate):
     note = {"id": note_id, **data.model_dump()}
     note[note_id] = note
     return note
+
+@app.put("/notes/{note_id}", response_model = Note)
+def update_note(note_id: int, data: NoteCreate):
+    if note_id not in notes:
+        raise HTTPException(status_code = 404, detail = "Note not found")
+
+    if data.calendar_id not in calendars:
+        raise HTTPException(status_code = 404, detail = "Calendar not found")
+    updated_note = {"id": note_id, **data.model_dump()}
+    note[note_id] = updated_note
+    return updated_note
+
+@app.delete("/notes/{note_id}")
+def detele_note(note_id: int):
+    if note_id not in notes:
+        raise HTTPException(status_code = 404, detail = "Note not found")
+
+    del note[note_id]
+    return {"message": f"Note {note_id} deleted"}
