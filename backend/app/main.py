@@ -127,3 +127,49 @@ def create_calendar(user_id: int, data: CalendarCreate):
 @app.get("/user/{user_id}/calendars/", response_model = list[Calendar])
 def list_calendar(user_id: int):
     return [c for c in calendar.values() if c["user_id"] == user_id]
+
+#Lesson
+@app.post("/calendars/{calendar_id}/lessons/", response_model = Lesson)
+def create_lesson(calendar_id: int, data: LessonCreate):
+    if calendar_id not in calendar:
+        raise HTTPException(status_code = 404, details = "Calendar not found")
+    les_id = next_id("lesson")
+    lesson = {"id": les_id, **data.model_dump()}
+    lessons[les_id] = lesson
+    return lesson
+
+@app.get("/user/{calender_id}/lessons/", response_model = list[Lesson])
+def list_lesson(user_id: int):
+    return [l for l in lesson.values() if l["calendar_id"] == calendar_id]
+
+#Task
+@app.post("/task", resposne_model = Lesson)
+def create_task(data: TaskCreate):
+    if calendar_id not in calendar:
+        raise HTTPException(status_code = 404, details = "Calendar not found")
+    task_id = next_id("task")
+    task = {"id": task_id, **data.model_dump()}
+    tasks[task_id] = task
+    return task
+
+@app.get("/calendars/{calendar_id}/tasks/", response_model = lisr[Task])
+def list_calendar(calendar_id: int):
+    return [t for t in task.values() if l["calendar_id"] == calendar_id]
+
+@app.patch("/tasks/{task_id}/toggle-done", response_model = Task)
+def toggle_done(task_id: int):
+    task = tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code = 404, details = "Task not found")
+    task["is_done"] = not task["is_done"]
+    return task
+
+#Notes
+@app.post("/notes", response_model = Notes)
+def create_notes(notes: NoteCreate):
+    if data.calendar_id not in calendar:
+        raise HTTPException(status_code = 404, details = "Calendar not found")
+    note_id = next_id("note")
+    note = {"id": note_id, **data.model_dump()}
+    notes[note_id] = note
+    return note
