@@ -1,6 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
+from .database import engine
+from . import models
+
+model.Base.metadata.create_all(bind = engine)
 
 #User(data that come from client)
 class UserCreate(BaseModel):
