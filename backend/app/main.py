@@ -46,9 +46,9 @@ class LessonCreate(BaseModel):
     day_of_week: str
     time_start: str
     time_end: str
-    descriptions: Optional[str] = None
+    description: Optional[str] = None
     color: str = "#3498db"
-    is_reccuring: bool = True
+    is_recurring: bool = True
     links: List[str] = []
     files: List[str] = []
 
@@ -64,7 +64,7 @@ class TaskCreate(BaseModel):
     lesson_id: Optional[int] = None
     parent_task_id: Optional[int] = None
     title: str
-    descriptions: Optional[str] = None
+    description: Optional[str] = None
     day: str
     time: Optional[str] = None
     deadline: Optional[str] = None
@@ -130,17 +130,17 @@ def create_user(data: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
-@app.get("/user/{user_id}", response_model = User)
+@app.get("/users/{user_id}", response_model = User)
 def get_user(user_id: int, db: Session = Depends(get_db)):
     found_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
+    if not found_user:
         raise HTTPException(status_code = 404, detail = "User not found")
-    return user
+    return found_user
 
 @app.put("/users/{user_id}", response_model = User)
-def update_user(user_id: int, data: UserCreate, db = Session(User)):
+def update_user(user_id: int, data: UserCreate, db: Session = Depends(get_db)):
     found_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user_id not in users:
+    if not found_user:
         raise HTTPException(status_code = 404, detail = "User not found")
 
     found_user.email = data.email
@@ -154,7 +154,7 @@ def update_user(user_id: int, data: UserCreate, db = Session(User)):
 @app.delete("/users/{user_id}")
 def detele_user(user_id: int, db: Session = Depends(get_db)):
     found_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user_id not in users:
+    if not found_user:
         raise HTTPException(status_code = 404, detail = "User not found")
 
     db.delete(found_user)
@@ -165,7 +165,7 @@ def detele_user(user_id: int, db: Session = Depends(get_db)):
 @app.post("/users/{user_id}/calendars/", response_model = Calendar)
 def create_calendar(user_id: int, data: CalendarCreate, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user_id not in user:
+    if not user:
         raise HTTPException(status_code = 404, detail = "User not found")
     new_calendar = models.Calendar(
         name = data.name,
@@ -179,14 +179,14 @@ def create_calendar(user_id: int, data: CalendarCreate, db: Session = Depends(ge
 
 @app.get("/users/{user_id}/calendars/", response_model = list[Calendar])
 def list_calendar(user_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Calendar).filter(models.Calendar.User.id == user_id).all()
+    return db.query(models.Calendar).filter(models.Calendar.user_id == user_id).all()
 
 @app.put("/users/{user_id}/calendars/{cal_id}", response_model = Calendar)
 def update_calendar(user_id: int, cal_id: int, data: CalendarCreate, db: Session = Depends(get_db)):
     calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
-    if cal_id not in calendars:
+    if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
-    if user_id not in users:
+    if not user:
         raise HTTPException(status_code = 404, detail = "User not found")
 
     calendar.name = data.name
@@ -200,7 +200,7 @@ def update_calendar(user_id: int, cal_id: int, data: CalendarCreate, db: Session
 @app.delete("/users/{user_id}/calendars/{cal_id}")
 def delete_calendar(user_id: int, cal_id: int, db: Session = Depends(get_db)):
     calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
-    if cal_id not in calendars:
+    if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
 
     db.delete(calendar)
@@ -209,9 +209,9 @@ def delete_calendar(user_id: int, cal_id: int, db: Session = Depends(get_db)):
 
 #Lesson
 @app.post("/calendars/{cal_id}/lessons/", response_model = Lesson)
-def create_lesson(calendar_id: int, data: LessonCreate, db: Session = Depends(get_db)):
+def create_lesson(cal_id: int, data: LessonCreate, db: Session = Depends(get_db)):
     calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
-    if calendar_id not in calendar:
+    if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
     new_lesson = models.Lesson(
         name = data.name,
@@ -219,12 +219,12 @@ def create_lesson(calendar_id: int, data: LessonCreate, db: Session = Depends(ge
         day_of_week = data.day_of_week,
         time_start = data.time_start,
         time_end = data.time_end,
-        descriptions = data.descriptions,
+        description = data.description,
         color = data.color,
-        is_reccuring = data.is_reccuring,
+        is_recurring = data.is_recurring,
         links = data.links,
         files = data.files,
-        calendar_id = calendar_id,
+        calendar_id = data.calendar_id,
     )
 
     db.add(new_lesson)
@@ -232,16 +232,17 @@ def create_lesson(calendar_id: int, data: LessonCreate, db: Session = Depends(ge
     db.refresh(new_lesson)
     return new_lesson
 
-@app.get("/user/{cal_id}/lessons/", response_model = list[Lesson])
-def list_lesson(calendar_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Calendar).filter(models.Lesson.Calendar.id == cal_id).all()
+@app.get("/user/{cal_id}/lessons/{les_id}", response_model = list[Lesson])
+def list_lesson(cal_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Lesson).filter(models.Lesson.calendar_id == cal_id).all()
 
 @app.put("/calendars/{cal_id}/lessons/{les_id}", response_model = Lesson)
-def update_lesson(cal_id: int, les_id: int, data: LessonCreate, bd: Session = Depends(get_db)):
+def update_lesson(cal_id: int, les_id: int, data: LessonCreate, db: Session = Depends(get_db)):
     lesson = db.query(models.Lesson).filter(models.Lesson.id == les_id).first()
-    if les_id not in lessons:
+    if not lesson:
         raise HTTPException(status_code = 404, detail = "Lesson not found")
-    if cal_id not in calendars:
+    calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
+    if not calendar:
         raise HTTPException(status_code = 404, detail = "Calender not found")
 
     lesson.name = data.name
@@ -249,12 +250,12 @@ def update_lesson(cal_id: int, les_id: int, data: LessonCreate, bd: Session = De
     lesson.day_of_week = data.day_of_week
     lesson.time_start = data.time_start
     lesson.time_end = data.time_end
-    lesson.descriptions = data.descriptions
+    lesson.description = data.description
     lesson.color = data.color
-    lesson.is_reccuring = data.is_reccuring
+    lesson.is_recurring = data.is_recurring
     lesson.links = data.links
     lesson.files = data.files
-    lesson.calendar_id = calendar_id
+    lesson.calendar_id = data.calendar_id
 
     db.commit()
     db.refresh(lesson)
@@ -263,7 +264,7 @@ def update_lesson(cal_id: int, les_id: int, data: LessonCreate, bd: Session = De
 @app.delete("/calendars/{cal_id}/lessons/{les_id}")
 def delete_lesson(cal_id: int, les_id: int, db: Session = Depends(get_db)):
     lesson = db.query(models.Lesson).filter(models.Lesson.id == les_id).first()
-    if les_id not in lessons:
+    if not lesson:
         raise HTTPException(status_code = 404, detail = "Lesson not found")
     
     db.delete(lesson)
@@ -275,11 +276,12 @@ def delete_lesson(cal_id: int, les_id: int, db: Session = Depends(get_db)):
 #Task
 @app.post("/task", response_model = Task)
 def create_task(data: TaskCreate, db: Session = Depends(get_db)):
-    if data.calendar_id not in calendar:
+    calendar = db.query(models.Calendar).filter(models.Calendar.id == data.calendar_id).first()
+    if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
     new_task = models.Task(
         title = data.title,
-        descriptions = data.descriptions,
+        description = data.description,
         day = data.day,
         time = data.time,
         deadline = data.deadline,
@@ -288,7 +290,7 @@ def create_task(data: TaskCreate, db: Session = Depends(get_db)):
         files = data.files,
         is_done = data.is_done,
         calendar_id = data.calendar_id,
-        lesson_id = data.is_donelesson_id,
+        lesson_id = data.lesson_id,
         parent_task_id = data.parent_task_id,
     )
     db.add(new_task)
@@ -298,7 +300,7 @@ def create_task(data: TaskCreate, db: Session = Depends(get_db)):
 
 @app.get("/calendars/{calendar_id}/tasks/", response_model = list[Task])
 def list_tasks(calendar_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Task).filter(models.Task.Calendar.id == calendar_id).all()
+    return db.query(models.Task).filter(models.Task.calendar_id == calendar_id).all()
 
 @app.patch("/tasks/{task_id}/toggle-done", response_model = Task)
 def toggle_done(task_id: int, db: Session = Depends(get_db)):
@@ -314,17 +316,17 @@ def toggle_done(task_id: int, db: Session = Depends(get_db)):
 @app.put("/tasks/{task_id}", response_model = Task)
 def update_task(task_id: int, data: TaskCreate, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if task_id not in tasks:
+    if not task:
         raise HTTPException(status_code = 404, detail = "Task not found")
     calendar = db.query(models.Calendar).filter(models.Calendar.id == data.calendar_id).first()    
-    if data.calendar_id not in calendars:
+    if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
 
     task.calendar_id = data.calendar_id
     task.lesson_id = data.lesson_id
     task.parent_task_id = data.parent_task_id
     task.title = data.title
-    task.descriptions = data.descriptions
+    task.description = data.description
     task.day = data.day
     task.time = data.time
     task.deadline = data.deadline
@@ -340,7 +342,7 @@ def update_task(task_id: int, data: TaskCreate, db: Session = Depends(get_db)):
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: int, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if task_id not in tasks:
+    if not task:
         raise HTTPException(status_code = 404, detail = "Task not found")
 
     db.delete(task)
@@ -352,7 +354,7 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 @app.post("/notes", response_model = Note)
 def create_notes(data: NoteCreate, db: Session = Depends(get_db)):
     calendar = db.query(models.Calendar).filter(models.Calendar.id == data.calendar_id).first()
-    if data.calendar_id not in calendar:
+    if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
     new_note = models.Note(
         calendar_id = data.calendar_id,
@@ -367,10 +369,10 @@ def create_notes(data: NoteCreate, db: Session = Depends(get_db)):
 @app.put("/notes/{note_id}", response_model = Note)
 def update_note(note_id: int, data: NoteCreate, db: Session = Depends(get_db)):
     note = db.query(models.Note).filter(models.Note.id == note_id).first()
-    if note_id not in notes:
+    if not note:
         raise HTTPException(status_code = 404, detail = "Note not found")
     calendar = db.query(models.Calendar).filter(models.Calendar.id == data.calendar_id).first()
-    if data.calendar_id not in calendars:
+    if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
 
     note.calendar_id = data.calendar_id
@@ -382,9 +384,9 @@ def update_note(note_id: int, data: NoteCreate, db: Session = Depends(get_db)):
     return note
 
 @app.delete("/notes/{note_id}")
-def detele_note(note_id: int):
+def detele_note(note_id: int, db: Session = Depends(get_db)):
     note = db.query(models.Note).filter(models.Note.id == note_id).first()
-    if note_id not in notes:
+    if not note:
         raise HTTPException(status_code = 404, detail = "Note not found")
 
     db.delete(note)
