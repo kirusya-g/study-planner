@@ -37,7 +37,7 @@ class Lesson(Base):
     time_end = Column(String)
     description = Column(String, nullable = True)
     color = Column(String, default = "#3498db")
-    is_reccurind = Column(Boolean, default = True)
+    is_recurring = Column(Boolean, default = True)
     links = Column(ARRAY(String), default = [])
     files = Column(ARRAY(String), default = [])
 
@@ -64,9 +64,9 @@ class Task(Base):
     calendar = relationship("Calendar", back_populates = "tasks")
 
     lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable = True)
-    lesson = relationship("Lesson", back_populates = "task")
+    lesson = relationship("Lesson", back_populates = "tasks")
 
-    parent_task_id = Column(Integer, ForeignKey("task.id"), nullable = True)
+    parent_task_id = Column(Integer, ForeignKey("tasks.id"), nullable = True)
     subtasks = relationship("Task", back_populates = "parent_task", remote_side =[id])
     parent_task = relationship("Task", back_populates = "subtasks", remote_side = [parent_task_id])
 
