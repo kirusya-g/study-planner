@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from . import auth
 
 from .database import engine, get_db
 from . import models
@@ -91,6 +92,14 @@ class Note(NoteCreate):
     class Config:
         from_attributes = True
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
 #TEMPORARY STORAGE (instead of a database)
 user: dict = {}
 calendar: dict = {}
@@ -120,10 +129,11 @@ def root():
 #Users
 @app.post("/users", response_model = User)
 def create_user(data: UserCreate, db: Session = Depends(get_db)):
+    hashed_password = auth.hash_password(data.password)
     new_user = models.User(
         email = data.email,
         nickname = data.nickname,
-        password = data.password,
+        password = hashed_password,
     )
     db.add(new_user)
     db.commit()
@@ -145,7 +155,7 @@ def update_user(user_id: int, data: UserCreate, db: Session = Depends(get_db)):
 
     found_user.email = data.email
     found_user.nickname = data.nickname
-    found_user.password = data.password
+    found_user.password = auth.hash_password(data.password)
 
     db.commit()
     db.refresh(found_user)
@@ -160,6 +170,16 @@ def detele_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(found_user)
     db.commit()
     return {"message": f"User {user_id} deleted"}
+
+@app.post("/login", response_model = Token)
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+    if not user or not auth.verify_password(data.password, user.password):
+        raise HTTPException(status_code = 401, detail = "Inncorrect email or password")
+
+    access_token = auth.create_access_token(data = {"user_id": user.id})
+    return {"access_token": access_token, "token_type": "bearer"}
+
 
 #Calendar
 @app.post("/users/{user_id}/calendars/", response_model = Calendar)
