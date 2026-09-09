@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from . import auth
+from .auth import get_current_user_id
 
 from .database import engine, get_db
 from . import models
@@ -183,7 +184,13 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
 #Calendar
 @app.post("/users/{user_id}/calendars/", response_model = Calendar)
-def create_calendar(user_id: int, data: CalendarCreate, db: Session = Depends(get_db)):
+def create_calendar(user_id: int,
+                     data: CalendarCreate,
+                     db: Session = Depends(get_db),
+                     current_user_id: int = Depends(get_current_user_id)):
+    if user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to create a calendar for another user")
+
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code = 404, detail = "User not found")
@@ -198,11 +205,21 @@ def create_calendar(user_id: int, data: CalendarCreate, db: Session = Depends(ge
     return new_calendar
 
 @app.get("/users/{user_id}/calendars/", response_model = list[Calendar])
-def list_calendar(user_id: int, db: Session = Depends(get_db)):
+def list_calendar(user_id: int, 
+                  db: Session = Depends(get_db),
+                  current_user_id: int = Depends(get_current_user_id)):
+    if user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to view another user's calendars")
+
     return db.query(models.Calendar).filter(models.Calendar.user_id == user_id).all()
 
 @app.put("/users/{user_id}/calendars/{cal_id}", response_model = Calendar)
-def update_calendar(user_id: int, cal_id: int, data: CalendarCreate, db: Session = Depends(get_db)):
+def update_calendar(user_id: int, cal_id: int, 
+                    data: CalendarCreate, 
+                    db: Session = Depends(get_db),
+                    current_user_id: int = Depends(get_current_user_id)):
+    if user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to modify another users calendar")
     calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
     if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
@@ -218,7 +235,13 @@ def update_calendar(user_id: int, cal_id: int, data: CalendarCreate, db: Session
     return calendar
 
 @app.delete("/users/{user_id}/calendars/{cal_id}")
-def delete_calendar(user_id: int, cal_id: int, db: Session = Depends(get_db)):
+def delete_calendar(user_id: int,
+                     cal_id: int, 
+                     db: Session = Depends(get_db),
+                     current_user_id: int = Depends(get_current_user_id)):
+    if user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to delete another users calendar")
+    
     calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
     if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
@@ -229,10 +252,16 @@ def delete_calendar(user_id: int, cal_id: int, db: Session = Depends(get_db)):
 
 #Lesson
 @app.post("/calendars/{cal_id}/lessons/", response_model = Lesson)
-def create_lesson(cal_id: int, data: LessonCreate, db: Session = Depends(get_db)):
+def create_lesson(cal_id: int, 
+                  data: LessonCreate, 
+                  db: Session = Depends(get_db),
+                  current_user_id: int = Depends(get_current_user_id)):
     calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
     if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to add lesson to another users calendar")
+    
     new_lesson = models.Lesson(
         name = data.name,
         room = data.room,
@@ -253,17 +282,30 @@ def create_lesson(cal_id: int, data: LessonCreate, db: Session = Depends(get_db)
     return new_lesson
 
 @app.get("/user/{cal_id}/lessons/{les_id}", response_model = list[Lesson])
-def list_lesson(cal_id: int, db: Session = Depends(get_db)):
+def list_lesson(cal_id: int, 
+                db: Session = Depends(get_db),
+                current_user_id: int = Depends(get_current_user_id)):
+    calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
+    if not calendar:
+            raise HTTPException(status_code = 404, detail = "Calender not found")
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to view lesson in another users calendar")
     return db.query(models.Lesson).filter(models.Lesson.calendar_id == cal_id).all()
 
 @app.put("/calendars/{cal_id}/lessons/{les_id}", response_model = Lesson)
-def update_lesson(cal_id: int, les_id: int, data: LessonCreate, db: Session = Depends(get_db)):
+def update_lesson(cal_id: int, 
+                  les_id: int, 
+                  data: LessonCreate, 
+                  db: Session = Depends(get_db),
+                  current_user_id: int = Depends(get_current_user_id)):
     lesson = db.query(models.Lesson).filter(models.Lesson.id == les_id).first()
     if not lesson:
         raise HTTPException(status_code = 404, detail = "Lesson not found")
     calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
     if not calendar:
         raise HTTPException(status_code = 404, detail = "Calender not found")
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to modify lesson on another users calendar")
 
     lesson.name = data.name
     lesson.room = data.room
@@ -282,11 +324,19 @@ def update_lesson(cal_id: int, les_id: int, data: LessonCreate, db: Session = De
     return lesson
 
 @app.delete("/calendars/{cal_id}/lessons/{les_id}")
-def delete_lesson(cal_id: int, les_id: int, db: Session = Depends(get_db)):
+def delete_lesson(cal_id: int, 
+                  les_id: int, 
+                  db: Session = Depends(get_db),
+                  current_user_id: int = Depends(get_current_user_id)):
     lesson = db.query(models.Lesson).filter(models.Lesson.id == les_id).first()
     if not lesson:
         raise HTTPException(status_code = 404, detail = "Lesson not found")
-    
+    calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
+    if not calendar:
+        raise HTTPException(status_code = 404, detail = "Calendar not found")
+
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to detele lesson in another users calendar")
     db.delete(lesson)
     db.commit()
     return {"message": f"Lesson {les_id} deleted"}
@@ -295,10 +345,14 @@ def delete_lesson(cal_id: int, les_id: int, db: Session = Depends(get_db)):
 
 #Task
 @app.post("/task", response_model = Task)
-def create_task(data: TaskCreate, db: Session = Depends(get_db)):
+def create_task(data: TaskCreate, 
+                db: Session = Depends(get_db),
+                current_user_id: int = Depends(get_current_user_id)):
     calendar = db.query(models.Calendar).filter(models.Calendar.id == data.calendar_id).first()
     if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to add task to another users calendar")
     new_task = models.Task(
         title = data.title,
         description = data.description,
@@ -319,29 +373,44 @@ def create_task(data: TaskCreate, db: Session = Depends(get_db)):
     return new_task
 
 @app.get("/calendars/{calendar_id}/tasks/", response_model = list[Task])
-def list_tasks(calendar_id: int, db: Session = Depends(get_db)):
+def list_tasks(calendar_id: int, 
+               db: Session = Depends(get_db),
+               current_user_id: int = Depends(get_current_user_id)):
+    calendar = db.query(models.Calendar).filter(models.Calendar.id == cal_id).first()
+    if not calendar:
+            raise HTTPException(status_code = 404, detail = "Calender not found")
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to view lesson in another users calendar")
     return db.query(models.Task).filter(models.Task.calendar_id == calendar_id).all()
 
 @app.patch("/tasks/{task_id}/toggle-done", response_model = Task)
-def toggle_done(task_id: int, db: Session = Depends(get_db)):
+def toggle_done(task_id: int, 
+                db: Session = Depends(get_db),
+                current_user_id: int = Depends(get_current_user_id)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code = 404, detail = "Task not found")
-
+    calendar = db.query(models.Calendar).filter(models.Calendar.id == task.calendar_id).first()
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to toggle a task in another users calendar")
     task.is_done = not task.is_done
     db.commit()
     db.refresh(task)
     return task
 
 @app.put("/tasks/{task_id}", response_model = Task)
-def update_task(task_id: int, data: TaskCreate, db: Session = Depends(get_db)):
+def update_task(task_id: int, 
+                data: TaskCreate, 
+                db: Session = Depends(get_db),
+                current_user_id: int = Depends(get_current_user_id)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code = 404, detail = "Task not found")
     calendar = db.query(models.Calendar).filter(models.Calendar.id == data.calendar_id).first()    
     if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
-
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to modify task in another users calendar")
     task.calendar_id = data.calendar_id
     task.lesson_id = data.lesson_id
     task.parent_task_id = data.parent_task_id
@@ -360,11 +429,15 @@ def update_task(task_id: int, data: TaskCreate, db: Session = Depends(get_db)):
     return task
 
 @app.delete("/tasks/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db)):
+def delete_task(task_id: int, 
+                db: Session = Depends(get_db),
+                current_user_id: int = Depends(get_current_user_id)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code = 404, detail = "Task not found")
-
+    calendar = db.query(models.Calendar).filter(models.Calendar.id == task.calendar_id).first()
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to delete task in another users calendar")
     db.delete(task)
     db.commit()
     return {"message": f"Task {task_id} deleted"}
@@ -372,10 +445,14 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 
 #Notes
 @app.post("/notes", response_model = Note)
-def create_notes(data: NoteCreate, db: Session = Depends(get_db)):
+def create_notes(data: NoteCreate, 
+                 db: Session = Depends(get_db),
+                 current_user_id: int = Depends(get_current_user_id)):
     calendar = db.query(models.Calendar).filter(models.Calendar.id == data.calendar_id).first()
     if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to add note to another users calendar")
     new_note = models.Note(
         calendar_id = data.calendar_id,
         day = data.day,
@@ -387,14 +464,18 @@ def create_notes(data: NoteCreate, db: Session = Depends(get_db)):
     return new_note
 
 @app.put("/notes/{note_id}", response_model = Note)
-def update_note(note_id: int, data: NoteCreate, db: Session = Depends(get_db)):
+def update_note(note_id: int, 
+                data: NoteCreate, 
+                db: Session = Depends(get_db),
+                current_user_id: int = Depends(get_current_user_id)):
     note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code = 404, detail = "Note not found")
     calendar = db.query(models.Calendar).filter(models.Calendar.id == data.calendar_id).first()
     if not calendar:
         raise HTTPException(status_code = 404, detail = "Calendar not found")
-
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to modify note in another users calendar")
     note.calendar_id = data.calendar_id
     note.day = data.day
     note.text = data.text
@@ -404,11 +485,15 @@ def update_note(note_id: int, data: NoteCreate, db: Session = Depends(get_db)):
     return note
 
 @app.delete("/notes/{note_id}")
-def detele_note(note_id: int, db: Session = Depends(get_db)):
+def detele_note(note_id: int, 
+                db: Session = Depends(get_db),
+                current_user_id: int = Depends(get_current_user_id)):
     note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code = 404, detail = "Note not found")
-
+    calendar = db.query(models.Calendar).filter(models.Calendar.id == note.calendar_id).first()
+    if calendar.user_id != current_user_id:
+        raise HTTPException(status_code = 403, detail = "Not allowed to delete note in another users calendar")
     db.delete(note)
     db.commit()
     return {"message": f"Note {note_id} deleted"}
