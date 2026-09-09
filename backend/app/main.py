@@ -4,6 +4,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from . import auth
 from .auth import get_current_user_id
+from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine, get_db
 from . import models
@@ -126,6 +127,15 @@ app = FastAPI(title="Study Planner API")
 @app.get("/")
 def root():
     return {"message": "Study Planner API"}
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = ["http://localhost:5173"],
+    allow_credentials = True,
+    allow_methods = ["*"],
+    allow_headers = ["*"]
+
+)
 
 #Users
 @app.post("/users", response_model = User)
