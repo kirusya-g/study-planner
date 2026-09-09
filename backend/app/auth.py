@@ -1,6 +1,11 @@
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+
+security = HTTPBearer()
 
 #Password hashing setup
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated= "auto")
@@ -39,3 +44,15 @@ def decode_access_token(token: str) -> dict | None:
         return payload
     except JWTError:
         return None
+
+def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(status_code = 401, detail = "Invalid or expire token")
+
+    user_id = payload.get("user_id")
+    if user_id is None:
+        raise HTTPException(status_code = 401, detail = "Invalid token payload")
+    
+    return user_id
