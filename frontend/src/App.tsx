@@ -1,33 +1,51 @@
 // App.tsx
-// This is the main component of our app. Right now it only contains
-// a simple login form that talks to our FastAPI backend.
+// Main app component: handles login, and once logged in, shows the list of calendars.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 
-// The address where our backend is running
 const API_URL = "http://127.0.0.1:8000";
 
+// Shape of a calendar object, matching our backend's Calendar model
+type Calendar = {
+  id: number;
+  user_id: number;
+  name: string;
+  color: string;
+};
+
+// Decodes the payload of a JWT token without verifying its signature.
+// This is safe here because we only use it to read the user_id for display —
+// the backend is the one that actually verifies the token on every request.
+function decodeToken(token: string): { user_id: number } | null {
+  try {
+    const payload = token.split(".")[1];
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
+
 function App() {
-  // useState creates a piece of state — a value that React remembers
-  // between renders, and that triggers a re-render when it changes.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // This function runs when the user submits the login form
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault(); // stop the browser from reloading the page on submit
+  // Try to load an existing token from localStorage when the app first loads
+  const [token, setToken] = useState<string | null>(() =>
+    localStorage.getItem("token")
+  );
 
+  const [calendars, setCalendars] = useState<Calendar[]>([]);
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
     setError(null);
 
     try {
       const response = await fetch(`${API_URL}/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
@@ -36,23 +54,84 @@ function App() {
       }
 
       const data = await response.json();
+      localStorage.setItem("token", data.access_token);
       setToken(data.access_token);
     } catch (err) {
       setError((err as Error).message);
     }
   }
 
-  // If we already have a token, show a simple "logged in" message
+  function handleLogout() {
+    localStorage.removeItem("token");
+    setToken(null);
+    setCalendars([]);
+  }
+
+  // useEffect runs code in response to something changing — here, whenever
+  // "token" changes, we fetch the user's calendars.
+  useEffect(() => {
+    if (!token) return;
+
+    const decoded = decodeToken(token);
+    if (!decoded) return;
+
+    async function fetchCalendars() {
+      const response = await fetch(
+        `${API_URL}/users/${decoded!.user_id}/calendars`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setCalendars(data);
+      }
+    }
+
+    fetchCalendars();
+  }, [token]);
+
+  // ---------- Logged in view ----------
   if (token) {
     return (
-      <div style={{ padding: "2rem" }}>
-        <h1>You are logged in!</h1>
-        <p style={{ wordBreak: "break-all" }}>Token: {token}</p>
+      <div style={{ padding: "2rem", maxWidth: "400px", margin: "0 auto" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <h1>My Calendars</h1>
+          <button onClick={handleLogout}>Log out</button>
+        </div>
+
+        {calendars.length === 0 && <p>No calendars yet.</p>}
+
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          {calendars.map((cal) => (
+            <li
+              key={cal.id}
+              style={{
+                padding: "0.75rem",
+                marginBottom: "0.5rem",
+                borderLeft: `6px solid ${cal.color}`,
+                background: "#222",
+                borderRadius: "4px",
+              }}
+            >
+              {cal.name}
+            </li>
+          ))}
+        </ul>
       </div>
     );
   }
 
-  // Otherwise, show the login form
+  // ---------- Login form view ----------
   return (
     <div style={{ padding: "2rem", maxWidth: "300px", margin: "0 auto" }}>
       <h1>Study Planner</h1>
